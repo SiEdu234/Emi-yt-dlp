@@ -1,235 +1,239 @@
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+import customtkinter as ctk
 import threading
 import os
 import time
+from tkinter import filedialog, messagebox
 from api_client import APIClient
 
-class YouTubeDownloaderApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("YouTube Downloader Pro (Client)")
-        self.root.geometry("700x850")
-        self.root.resizable(False, False)
-        
+# Configuración global de apariencia
+ctk.set_appearance_mode("Dark")  # Modes: "System" (standard), "Dark", "Light"
+ctk.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
+
+class YouTubeDownloaderApp(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+
+        # Configuración de la ventana principal
+        self.title("Emi YouTube Downloader Pro")
+        self.geometry("900x600")
+        self.minsize(800, 600)
+
+        # Cliente API
         self.api = APIClient()
-        
-        # Variables
-        self.url_var = tk.StringVar()
-        self.video_format_var = tk.StringVar()
-        self.audio_format_var = tk.StringVar()
-        self.subtitle_format_var = tk.StringVar()
-        self.output_path_var = tk.StringVar(value=os.path.expanduser("~/Downloads"))
-        self.status_var = tk.StringVar(value="Listo")
-        self.progress_var = tk.DoubleVar()
-        
-        self.fetching = False
-        self.downloading = False
         self.video_info = None
-        
-        self.setup_style()
-        self.create_widgets()
-        self.center_window()
+        self.downloading = False
 
-    def setup_style(self):
-        self.style = ttk.Style()
-        self.style.theme_use('clam')
-        
-        self.style.configure('.', background='#f0f0f0', foreground='#333333')
-        self.style.configure('TFrame', background='#f0f0f0')
-        self.style.configure('TLabel', background='#f0f0f0', font=('Segoe UI', 10))
-        self.style.configure('TEntry', fieldbackground='white', font=('Segoe UI', 10))
-        self.style.configure('TCombobox', fieldbackground='white', font=('Segoe UI', 10))
-        self.style.configure('TButton', font=('Segoe UI', 10), padding=6)
-        self.style.configure('Accent.TButton', foreground='white', background='#0078d7', font=('Segoe UI', 10, 'bold'))
-        self.style.map('Accent.TButton', background=[('active', '#005fa3'), ('disabled', '#cccccc')])
+        # Layout principal (Grid 2 columnas)
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
 
-    def create_widgets(self):
-        main_frame = ttk.Frame(self.root, padding="15")
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        # --- SIDEBAR (Izquierda) ---
+        self.sidebar_frame = ctk.CTkFrame(self, width=200, corner_radius=0)
+        self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
+        self.sidebar_frame.grid_rowconfigure(4, weight=1)
+
+        self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="Emi Downloader", font=ctk.CTkFont(size=20, weight="bold"))
+        self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+
+        self.sidebar_button_1 = ctk.CTkButton(self.sidebar_frame, text="Descargar", command=self.show_download_frame)
+        self.sidebar_button_1.grid(row=1, column=0, padx=20, pady=10)
         
+        self.appearance_mode_label = ctk.CTkLabel(self.sidebar_frame, text="Tema:", anchor="w")
+        self.appearance_mode_label.grid(row=5, column=0, padx=20, pady=(10, 0))
+        self.appearance_mode_optionemenu = ctk.CTkOptionMenu(self.sidebar_frame, values=["Dark", "Light", "System"],
+                                                                       command=self.change_appearance_mode_event)
+        self.appearance_mode_optionemenu.grid(row=6, column=0, padx=20, pady=(10, 20))
+
+        # --- FRAME PRINCIPAL (Derecha) ---
+        self.main_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        self.main_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
+        self.main_frame.grid_columnconfigure(0, weight=1)
+
+        # Elementos del Frame Principal
+        self.create_download_widgets()
+
+    def create_download_widgets(self):
         # Título
-        title_frame = ttk.Frame(main_frame)
-        title_frame.pack(fill=tk.X, pady=(0, 15))
-        ttk.Label(title_frame, text="YouTube Downloader Pro", font=('Segoe UI', 16, 'bold')).pack()
-        ttk.Label(title_frame, text="Cliente Remoto - Sin dependencias locales", font=('Segoe UI', 10), foreground="#666666").pack()
-        
-        # URL
-        url_frame = ttk.LabelFrame(main_frame, text=" URL del video ", padding=10)
-        url_frame.pack(fill=tk.X, pady=5)
-        url_entry = ttk.Entry(url_frame, textvariable=self.url_var, width=60)
-        url_entry.pack(fill=tk.X, padx=5, pady=5)
-        url_entry.focus()
-        
-        # Botón Buscar
-        self.fetch_btn = ttk.Button(main_frame, text="Buscar Información", command=self.start_fetch_thread, style='Accent.TButton')
-        self.fetch_btn.pack(fill=tk.X, pady=10)
-        
-        # Info del video (oculto al inicio)
-        self.info_frame = ttk.LabelFrame(main_frame, text=" Información ", padding=10)
-        self.info_label = ttk.Label(self.info_frame, text="")
-        self.info_label.pack(fill=tk.X)
-        
-        # Formatos
-        formats_frame = ttk.LabelFrame(main_frame, text=" Opciones ", padding=10)
-        formats_frame.pack(fill=tk.BOTH, expand=True, pady=5)
-        
-        ttk.Label(formats_frame, text="Calidad de Video:").grid(row=0, column=0, sticky=tk.W, padx=5, pady=2)
-        self.video_format_combobox = ttk.Combobox(formats_frame, textvariable=self.video_format_var, state="readonly", width=50)
-        self.video_format_combobox.grid(row=1, column=0, columnspan=2, sticky=tk.EW, padx=5, pady=5)
-        
-        ttk.Label(formats_frame, text="Formato de Salida:").grid(row=2, column=0, sticky=tk.W, padx=5, pady=2)
-        self.ext_combobox = ttk.Combobox(formats_frame, values=["mp4", "mkv", "webm", "mp3", "m4a"], state="readonly", width=50)
-        self.ext_combobox.set("mp4")
-        self.ext_combobox.grid(row=3, column=0, columnspan=2, sticky=tk.EW, padx=5, pady=5)
+        self.label_title = ctk.CTkLabel(self.main_frame, text="Descargar Video", font=ctk.CTkFont(size=24, weight="bold"))
+        self.label_title.grid(row=0, column=0, padx=10, pady=(0, 20), sticky="w")
 
-        ttk.Label(formats_frame, text="Subtítulos:").grid(row=4, column=0, sticky=tk.W, padx=5, pady=2)
-        self.subtitle_combobox = ttk.Combobox(formats_frame, textvariable=self.subtitle_format_var, state="readonly", width=50)
-        self.subtitle_combobox.grid(row=5, column=0, columnspan=2, sticky=tk.EW, padx=5, pady=5)
-        
-        # Destino
-        dest_frame = ttk.LabelFrame(main_frame, text=" Destino ", padding=10)
-        dest_frame.pack(fill=tk.X, pady=5)
-        ttk.Entry(dest_frame, textvariable=self.output_path_var, state="readonly").pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
-        ttk.Button(dest_frame, text="...", width=5, command=self.select_output_path).pack(side=tk.RIGHT, padx=5)
-        
-        # Botones Acción
-        buttons_frame = ttk.Frame(main_frame)
-        buttons_frame.pack(fill=tk.X, pady=15)
-        
-        self.download_btn = ttk.Button(buttons_frame, text="Descargar", command=self.start_download_thread, style='Accent.TButton', state="disabled")
-        self.download_btn.pack(fill=tk.X, pady=(0, 5))
-        
-        self.download_subs_btn = ttk.Button(buttons_frame, text="Descargar Solo Subtítulos", command=self.start_subs_download_thread, state="disabled")
-        self.download_subs_btn.pack(fill=tk.X)
-        
-        # Estado y Progreso
-        self.progress_bar = ttk.Progressbar(main_frame, variable=self.progress_var, maximum=100)
-        self.progress_bar.pack(fill=tk.X, pady=(10, 5))
-        
-        status_bar = ttk.Label(main_frame, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W, font=('Segoe UI', 9), foreground="#666666")
-        status_bar.pack(fill=tk.X)
+        # Input URL
+        self.url_entry = ctk.CTkEntry(self.main_frame, placeholder_text="Pega aquí el enlace de YouTube, Facebook, Instagram...", height=40)
+        self.url_entry.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="ew")
 
-    def center_window(self):
-        self.root.update_idletasks()
-        width = self.root.winfo_width()
-        height = self.root.winfo_height()
-        x = (self.root.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.root.winfo_screenheight() // 2) - (height // 2)
-        self.root.geometry(f'{width}x{height}+{x}+{y}')
+        self.btn_search = ctk.CTkButton(self.main_frame, text="Buscar Información", command=self.start_fetch_thread, height=40)
+        self.btn_search.grid(row=1, column=1, padx=10, pady=(0, 10))
 
-    def select_output_path(self):
-        path = filedialog.askdirectory()
-        if path:
-            self.output_path_var.set(path)
+        # Info del Video (Frame contenedor)
+        self.info_frame = ctk.CTkFrame(self.main_frame)
+        self.info_frame.grid(row=2, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        self.info_frame.grid_columnconfigure(1, weight=1)
+        self.info_frame.grid_remove() # Ocultar al inicio
 
-    def toggle_inputs(self, enable):
-        state = "normal" if enable else "disabled"
-        self.fetch_btn.config(state=state)
-        self.download_btn.config(state=state if self.video_info else "disabled")
-        self.download_subs_btn.config(state=state if self.video_info else "disabled")
-        self.video_format_combobox.config(state="readonly" if enable else "disabled")
-        self.ext_combobox.config(state="readonly" if enable else "disabled")
+        self.lbl_video_title = ctk.CTkLabel(self.info_frame, text="Título del Video", font=ctk.CTkFont(size=16, weight="bold"), anchor="w")
+        self.lbl_video_title.grid(row=0, column=0, columnspan=2, padx=15, pady=(15, 5), sticky="ew")
+
+        self.lbl_video_details = ctk.CTkLabel(self.info_frame, text="Duración: --:--", text_color="gray", anchor="w")
+        self.lbl_video_details.grid(row=1, column=0, columnspan=2, padx=15, pady=(0, 15), sticky="ew")
+
+        # Opciones de Descarga
+        self.options_frame = ctk.CTkFrame(self.main_frame)
+        self.options_frame.grid(row=3, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        self.options_frame.grid_columnconfigure((0, 1), weight=1)
+        
+        # Selector de Formato
+        ctk.CTkLabel(self.options_frame, text="Formato:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+        self.combo_format = ctk.CTkComboBox(self.options_frame, values=["mp4", "mp3", "m4a", "mkv", "webm"])
+        self.combo_format.set("mp4")
+        self.combo_format.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="ew")
+
+        # Selector de Calidad
+        ctk.CTkLabel(self.options_frame, text="Calidad:").grid(row=0, column=1, padx=10, pady=5, sticky="w")
+        self.combo_quality = ctk.CTkComboBox(self.options_frame, values=["Mejor disponible"])
+        self.combo_quality.grid(row=1, column=1, padx=10, pady=(0, 10), sticky="ew")
+
+        # Selector de Subtítulos
+        ctk.CTkLabel(self.options_frame, text="Subtítulos:").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+        self.combo_subs = ctk.CTkComboBox(self.options_frame, values=["Ninguno"])
+        self.combo_subs.grid(row=3, column=0, columnspan=2, padx=10, pady=(0, 10), sticky="ew")
+
+        # Botón Descargar
+        self.btn_download = ctk.CTkButton(self.main_frame, text="INICIAR DESCARGA", command=self.start_download_thread, height=50, font=ctk.CTkFont(size=15, weight="bold"), fg_color="green", hover_color="darkgreen")
+        self.btn_download.grid(row=4, column=0, columnspan=2, padx=10, pady=20, sticky="ew")
+        self.btn_download.configure(state="disabled")
+
+        # Barra de Progreso y Estado
+        self.progress_bar = ctk.CTkProgressBar(self.main_frame)
+        self.progress_bar.grid(row=5, column=0, columnspan=2, padx=10, pady=(10, 5), sticky="ew")
+        self.progress_bar.set(0)
+        
+        self.lbl_status = ctk.CTkLabel(self.main_frame, text="Listo para buscar", text_color="gray")
+        self.lbl_status.grid(row=6, column=0, columnspan=2, padx=10, pady=5)
+
+    def show_download_frame(self):
+        pass # Ya estamos aquí
+
+    def change_appearance_mode_event(self, new_appearance_mode: str):
+        ctk.set_appearance_mode(new_appearance_mode)
+
+    # --- LÓGICA ---
 
     def start_fetch_thread(self):
-        url = self.url_var.get().strip()
+        url = self.url_entry.get().strip()
         if not url:
-            messagebox.showerror("Error", "Ingresa una URL")
+            self.lbl_status.configure(text="⚠️ Por favor ingresa una URL válida", text_color="orange")
             return
         
-        self.fetching = True
-        self.toggle_inputs(False)
-        self.status_var.set("Obteniendo información del video...")
-        self.progress_bar.start(10)
+        self.btn_search.configure(state="disabled")
+        self.lbl_status.configure(text="🔍 Buscando información...", text_color="white")
+        self.progress_bar.configure(mode="indeterminate")
+        self.progress_bar.start()
         
         threading.Thread(target=self.fetch_info, args=(url,), daemon=True).start()
 
     def fetch_info(self, url):
         try:
             info = self.api.get_video_info(url)
-            self.root.after(0, self.on_fetch_success, info)
+            self.after(0, self.on_fetch_success, info)
         except Exception as e:
-            self.root.after(0, self.on_fetch_error, str(e))
+            self.after(0, self.on_fetch_error, str(e))
 
     def on_fetch_success(self, info):
-        self.fetching = False
         self.progress_bar.stop()
-        self.video_info = info
+        self.progress_bar.configure(mode="determinate")
+        self.progress_bar.set(0)
+        self.btn_search.configure(state="normal")
         
         if info.get('success'):
-            self.info_frame.pack(fill=tk.X, pady=5, after=self.fetch_btn)
+            self.video_info = info
+            self.info_frame.grid() # Mostrar panel de info
+            
             title = info.get('title', 'Sin título')
             duration = info.get('duration', '??:??')
-            self.info_label.config(text=f"{title}\nDuración: {duration}")
+            platform = info.get('platform', 'video').capitalize()
             
-            # Llenar resoluciones
+            self.lbl_video_title.configure(text=title)
+            self.lbl_video_details.configure(text=f"{platform} • Duración: {duration}")
+            
+            # Actualizar resoluciones
             resolutions = info.get('available_resolutions', [])
-            self.video_format_combobox['values'] = resolutions
             if resolutions:
-                self.video_format_combobox.current(0)
-            
-            # Llenar subtítulos
+                self.combo_quality.configure(values=resolutions)
+                self.combo_quality.set(resolutions[0])
+            else:
+                self.combo_quality.configure(values=["Mejor disponible"])
+                self.combo_quality.set("Mejor disponible")
+
+            # Actualizar subtítulos
             subtitles = info.get('available_subtitles', [])
-            sub_values = ["Ninguno"] + subtitles
-            self.subtitle_combobox['values'] = sub_values
-            self.subtitle_combobox.current(0)
+            # Convertir dict o lista a lista de opciones
+            sub_opts = ["Ninguno"]
+            if isinstance(subtitles, dict):
+                sub_opts.extend(subtitles.keys())
+            elif isinstance(subtitles, list):
+                sub_opts.extend(subtitles)
             
-            self.status_var.set("Información obtenida correctamente")
-            self.toggle_inputs(True)
-            self.download_btn.config(state="normal")
-            self.download_subs_btn.config(state="normal")
+            self.combo_subs.configure(values=sub_opts)
+            self.combo_subs.set("Ninguno")
+
+            self.btn_download.configure(state="normal")
+            self.lbl_status.configure(text="✅ Video encontrado. Configura y descarga.", text_color="lightgreen")
         else:
             self.on_fetch_error(info.get('error', 'Error desconocido'))
 
     def on_fetch_error(self, error):
-        self.fetching = False
         self.progress_bar.stop()
-        self.toggle_inputs(True)
-        self.status_var.set(f"Error: {error}")
+        self.btn_search.configure(state="normal")
+        self.lbl_status.configure(text=f"❌ Error: {error}", text_color="red")
         messagebox.showerror("Error", error)
 
     def start_download_thread(self):
         if self.downloading: return
         
-        url = self.url_var.get().strip()
-        resolution = self.video_format_var.get()
-        ext = self.ext_combobox.get()
-        subtitle = self.subtitle_format_var.get()
+        url = self.url_entry.get().strip()
+        fmt = self.combo_format.get()
+        quality = self.combo_quality.get()
+        sub = self.combo_subs.get()
         
-        audio_only = ext in ['mp3', 'm4a']
+        # Pedir carpeta de destino
+        dest_folder = filedialog.askdirectory()
+        if not dest_folder:
+            return
+
+        audio_only = fmt in ['mp3', 'm4a']
         
         options = {
-            "format": ext,
-            "resolution": resolution,
+            "format": fmt,
+            "resolution": quality,
             "audio_only": audio_only,
-            "subtitle_lang": subtitle if subtitle != "Ninguno" else None,
-            "embed_subs": True if subtitle != "Ninguno" else False
+            "subtitle_lang": sub if sub != "Ninguno" else None,
+            "embed_subs": True if sub != "Ninguno" else False
         }
         
         self.downloading = True
-        self.toggle_inputs(False)
-        self.status_var.set("Iniciando descarga remota...")
-        self.progress_var.set(0)
+        self.btn_download.configure(state="disabled")
+        self.url_entry.configure(state="disabled")
+        self.lbl_status.configure(text="🚀 Iniciando descarga remota...", text_color="cyan")
         
-        threading.Thread(target=self.process_download, args=(url, options), daemon=True).start()
+        threading.Thread(target=self.process_download, args=(url, options, dest_folder), daemon=True).start()
 
-    def process_download(self, url, options):
+    def process_download(self, url, options, dest_folder):
         try:
-            # 1. Iniciar descarga
+            # 1. Iniciar
             start_resp = self.api.start_download(url, options)
             if not start_resp.get('success'):
                 raise Exception(start_resp.get('error'))
             
             download_id = start_resp.get('download_id')
             
-            # 2. Polling de estado
+            # 2. Polling
             while True:
                 status = self.api.get_download_status(download_id)
                 state = status.get('status')
                 msg = status.get('message', '')
                 progress = status.get('progress', 0)
                 
-                self.root.after(0, self.update_status, msg, progress)
+                self.after(0, self.update_status, f"⏳ Servidor: {msg}", progress / 100)
                 
                 if state == 'completed':
                     filename = status.get('filename')
@@ -239,37 +243,39 @@ class YouTubeDownloaderApp:
                 
                 time.sleep(1)
             
-            # 3. Descargar archivo final
-            self.root.after(0, self.update_status, "Descargando archivo a tu PC...", 0)
-            dest_folder = self.output_path_var.get()
+            # 3. Descargar a local
+            self.after(0, self.update_status, "⬇️ Descargando archivo a tu PC...", 0)
             
             def dl_progress(p):
-                self.root.after(0, self.update_status, f"Transfiriendo: {p}%", p)
+                self.after(0, self.update_status, f"⬇️ Transfiriendo: {p}%", p / 100)
                 
             local_file = self.api.download_file(filename, dest_folder, progress_callback=dl_progress)
             
-            self.root.after(0, self.on_download_complete, local_file)
+            self.after(0, self.on_download_complete, local_file)
             
         except Exception as e:
-            self.root.after(0, self.on_download_error, str(e))
+            self.after(0, self.on_download_error, str(e))
 
-    def update_status(self, msg, progress):
-        self.status_var.set(msg)
-        self.progress_var.set(progress)
+    def update_status(self, msg, progress_float):
+        self.lbl_status.configure(text=msg, text_color="white")
+        self.progress_bar.set(progress_float)
 
     def on_download_complete(self, filepath):
         self.downloading = False
-        self.toggle_inputs(True)
-        self.status_var.set(f"Descarga completada: {os.path.basename(filepath)}")
-        self.progress_var.set(100)
-        messagebox.showinfo("Éxito", f"Archivo guardado en:\n{filepath}")
+        self.btn_download.configure(state="normal")
+        self.url_entry.configure(state="normal")
+        self.lbl_status.configure(text=f"✨ ¡Completado! Guardado en: {os.path.basename(filepath)}", text_color="lightgreen")
+        self.progress_bar.set(1)
+        messagebox.showinfo("Éxito", f"Archivo descargado correctamente:\n{filepath}")
 
     def on_download_error(self, error):
         self.downloading = False
-        self.toggle_inputs(True)
-        self.status_var.set(f"Error: {error}")
+        self.btn_download.configure(state="normal")
+        self.url_entry.configure(state="normal")
+        self.lbl_status.configure(text=f"❌ Error: {error}", text_color="red")
+        self.progress_bar.set(0)
         messagebox.showerror("Error de Descarga", error)
 
-    def start_subs_download_thread(self):
-        # Implementación similar para solo subtítulos
-        pass
+if __name__ == "__main__":
+    app = YouTubeDownloaderApp()
+    app.mainloop()

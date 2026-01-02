@@ -31,14 +31,14 @@ pip install pyinstaller
 
 # 4. Construir ejecutable
 echo "Construyendo ejecutable..."
-# --hidden-import: Forzar inclusión de tkinter
+# --collect-all customtkinter: Importante para incluir temas y assets de la librería
 pyinstaller --noconsole --onefile --clean \
     --name "Emi-yt-dlp" \
     --paths=src \
+    --collect-all customtkinter \
     --hidden-import=tkinter \
-    --hidden-import=tkinter.filedialog \
-    --hidden-import=tkinter.messagebox \
-    --hidden-import=tkinter.ttk \
+    --hidden-import=PIL \
+    --hidden-import=packaging \
     src/main.py
 
 echo "Construcción completada."
