@@ -42,10 +42,8 @@ coverage.xml
 # Logs
 *.log
 logs/
-Emilia.ico
-.Emilia.ico
+
+# Scripts internos
 upload_release.sh
 .upload_release.sh
-API_DOCS.md
-.API_DOCS.md
 
