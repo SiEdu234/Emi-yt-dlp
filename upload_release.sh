@@ -18,6 +18,12 @@ if [ -z "$VERSION" ]; then
     exit 1
 fi
 
+# Asegurar que la versión empiece por 'v' si el usuario lo olvidó
+if [[ ! "$VERSION" =~ ^v ]]; then
+    VERSION="v$VERSION"
+    echo "Corrigiendo versión a: $VERSION"
+fi
+
 # Título y notas
 read -p "Título del release (Enter para usar '$VERSION'): " TITLE
 TITLE=${TITLE:-$VERSION}

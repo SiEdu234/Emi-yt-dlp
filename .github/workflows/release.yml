@@ -3,7 +3,8 @@ name: Build and Release
 on:
   push:
     tags:
-      - 'v*' # Se ejecuta cuando subes un tag como v1.0, v1.1, etc.
+      - 'v*'
+      - '[0-9]*' # También acepta tags que empiezan por número (ej. 1.0)
 
 permissions:
   contents: write
