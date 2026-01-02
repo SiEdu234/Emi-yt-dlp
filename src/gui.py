@@ -39,8 +39,10 @@ class YouTubeDownloaderApp(ctk.CTk):
                     self.iconbitmap(icon_path)
                 else:
                     # Para Linux necesitamos cargar la imagen y usar ImageTk
+                    # IMPORTANTE: Mantener una referencia a la imagen para evitar el Garbage Collector
                     icon_img = Image.open(icon_path)
-                    self.iconphoto(True, ImageTk.PhotoImage(icon_img))
+                    self.app_icon = ImageTk.PhotoImage(icon_img)
+                    self.wm_iconphoto(True, self.app_icon)
         except Exception as e:
             print(f"No se pudo cargar el icono: {e}")
             pass
@@ -332,12 +334,20 @@ class YouTubeDownloaderApp(ctk.CTk):
             def dl_progress(p):
                 self.after(0, self.update_status, f"Transfiriendo: {p}%", p / 100)
                 
+            # Asegurar que el directorio existe
+            os.makedirs(dest_folder, exist_ok=True)
+            
             local_file = self.api.download_file(filename, dest_folder, progress_callback=dl_progress)
             
             # Verificar integridad
-            if not os.path.exists(local_file) or os.path.getsize(local_file) == 0:
-                raise Exception("El archivo se creó pero está vacío o no existe.")
+            if not os.path.exists(local_file):
+                raise Exception(f"El archivo no aparece en: {local_file}")
+                
+            file_size = os.path.getsize(local_file)
+            if file_size == 0:
+                raise Exception("El archivo se creó pero está vacío (0 bytes).")
 
+            print(f"DEBUG: Archivo guardado correctamente: {local_file} ({file_size} bytes)")
             self.after(0, self.on_download_complete, local_file)
             
         except Exception as e:

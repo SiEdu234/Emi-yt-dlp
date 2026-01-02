@@ -85,19 +85,26 @@ class APIClient:
 
     def _save_stream(self, response, local_filename, progress_callback):
         total_length = response.headers.get('content-length')
-        with open(local_filename, 'wb') as f:
-            if total_length is None:
-                f.write(response.content)
-            else:
-                dl = 0
-                total_length = int(total_length)
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        dl += len(chunk)
-                        f.write(chunk)
-                        if progress_callback:
-                            percent = int(100 * dl / total_length)
-                            progress_callback(percent)
+        print(f"DEBUG: Iniciando escritura en {local_filename}. Tamaño esperado: {total_length}")
+        
+        try:
+            with open(local_filename, 'wb') as f:
+                if total_length is None:
+                    f.write(response.content)
+                else:
+                    dl = 0
+                    total_length = int(total_length)
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            dl += len(chunk)
+                            f.write(chunk)
+                            if progress_callback:
+                                percent = int(100 * dl / total_length)
+                                progress_callback(percent)
+            print(f"DEBUG: Escritura finalizada en {local_filename}")
+        except Exception as e:
+            print(f"ERROR escribiendo archivo: {e}")
+            raise
 
     def download_subtitles(self, url, langs, destination_folder):
         """Descarga subtítulos."""
