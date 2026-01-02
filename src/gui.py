@@ -370,13 +370,16 @@ class YouTubeDownloaderApp(ctk.CTk):
                 msg = status.get('message', '')
                 progress = status.get('progress', 0)
                 
+                print(f"DEBUG: Estado recibido: {state}, mensaje: {msg}, progreso: {progress}")
                 self.after(0, self.update_status, f"Servidor: {msg}", progress / 100)
                 
-                if state == 'completed':
+                # El servidor usa 'complete' sin 'd' al final
+                if state == 'complete' or state == 'completed':
                     filename = status.get('filename')
+                    print(f"DEBUG: Descarga completada en servidor. Filename: {filename}")
                     break
                 elif state == 'error':
-                    raise Exception(status.get('error'))
+                    raise Exception(status.get('error') or status.get('message'))
                 
                 time.sleep(1)
             
