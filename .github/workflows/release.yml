@@ -44,9 +44,15 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: Build with PyInstaller
+      - name: Build with PyInstaller (Linux)
+        if: runner.os == 'Linux'
         run: |
-          pyinstaller --noconsole --onefile --clean --name "Emi-yt-dlp" --paths=src --collect-all customtkinter --hidden-import=tkinter --hidden-import=PIL --hidden-import=packaging src/main.py
+          pyinstaller --noconsole --onefile --clean --name "Emi-yt-dlp" --paths=src --collect-all customtkinter --hidden-import=tkinter --hidden-import=PIL --hidden-import=packaging --add-data "Emilia.ico:." src/main.py
+
+      - name: Build with PyInstaller (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          pyinstaller --noconsole --onefile --clean --name "Emi-yt-dlp" --paths=src --collect-all customtkinter --hidden-import=tkinter --hidden-import=PIL --hidden-import=packaging --add-data "Emilia.ico;." --icon "Emilia.ico" src/main.py
 
       - name: Rename artifact
         shell: bash

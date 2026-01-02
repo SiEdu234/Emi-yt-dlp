@@ -11,8 +11,9 @@ from tkinter import filedialog, messagebox
 from api_client import APIClient
 
 # --- CONFIGURACIÓN DE LOGS ---
-# Esto creará un archivo 'emi_debug.log' en la misma carpeta donde ejecutes la app
-log_filename = "emi_debug.log"
+# Guardar log en la carpeta de usuario para asegurar permisos y visibilidad
+log_filename = os.path.join(os.path.expanduser("~"), "emi_debug.log")
+
 logging.basicConfig(
     filename=log_filename,
     level=logging.DEBUG,
@@ -36,7 +37,8 @@ sys.stdout = LoggerWriter(logging.info)
 sys.stderr = LoggerWriter(logging.error)
 
 print("=== INICIANDO EMI DOWNLOADER ===")
-print(f"Directorio de trabajo: {os.getcwd()}")
+print(f"Log guardado en: {log_filename}")
+print(f"Directorio de trabajo (CWD): {os.getcwd()}")
 
 # Configuración global de apariencia
 ctk.set_appearance_mode("Dark")  # Modes: "System" (standard), "Dark", "Light"
@@ -46,6 +48,12 @@ class YouTubeDownloaderApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
+        # Mostrar alerta de log al inicio para que el usuario sepa dónde buscar
+        try:
+            messagebox.showinfo("Debug Mode", f"El archivo de registro (log) se está guardando en:\n{log_filename}\n\nRevisa este archivo si algo falla.")
+        except:
+            pass
+
         # Configuración de la ventana principal
         self.title("Emi YouTube Downloader Pro")
         self.geometry("900x700")
@@ -53,34 +61,46 @@ class YouTubeDownloaderApp(ctk.CTk):
         
         # Icono
         try:
-            # Buscar el icono en el directorio actual o en el directorio del proyecto
-            icon_path = "Emilia.ico"
-            print(f"Buscando icono en: {os.path.abspath(icon_path)}")
+            # Lógica robusta para encontrar el icono (soporte PyInstaller y Dev)
+            icon_name = "Emilia.ico"
             
+            # 1. Buscar en sys._MEIPASS (PyInstaller)
+            if hasattr(sys, '_MEIPASS'):
+                base_path = sys._MEIPASS
+            else:
+                base_path = os.path.abspath(".")
+            
+            icon_path = os.path.join(base_path, icon_name)
+            print(f"Buscando icono en ruta base: {icon_path}")
+
+            # 2. Si no está, buscar en directorio del script
             if not os.path.exists(icon_path):
-                # Si estamos en src/, el icono está arriba
                 script_dir = os.path.dirname(os.path.abspath(__file__))
-                project_root = os.path.dirname(script_dir)
-                possible_path = os.path.join(project_root, "Emilia.ico")
-                print(f"Intentando ruta alternativa: {possible_path}")
-                if os.path.exists(possible_path):
-                    icon_path = possible_path
+                icon_path = os.path.join(script_dir, icon_name)
+                print(f"Buscando icono en script dir: {icon_path}")
+            
+            # 3. Si no está, buscar en directorio padre (proyecto)
+            if not os.path.exists(icon_path):
+                project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                icon_path = os.path.join(project_root, icon_name)
+                print(f"Buscando icono en project root: {icon_path}")
 
             if os.path.exists(icon_path):
-                print(f"Icono encontrado en: {icon_path}")
-                # En Windows usa iconbitmap, en Linux iconphoto
+                print(f"¡Icono encontrado!: {icon_path}")
                 if os.name == 'nt':
                     self.iconbitmap(icon_path)
                 else:
-                    # Para Linux necesitamos cargar la imagen y usar ImageTk
-                    # IMPORTANTE: Mantener una referencia a la imagen para evitar el Garbage Collector
                     icon_img = Image.open(icon_path)
                     self.app_icon = ImageTk.PhotoImage(icon_img)
                     self.wm_iconphoto(True, self.app_icon)
             else:
-                print("ERROR: No se encontró el archivo Emilia.ico")
+                err_msg = f"No se encontró {icon_name} en ninguna ruta buscada."
+                print(f"ERROR: {err_msg}")
+                messagebox.showwarning("Icono Faltante", err_msg)
+                
         except Exception as e:
             print(f"EXCEPCIÓN cargando icono: {e}")
+            messagebox.showerror("Error Icono", str(e))
             pass
 
         # Cliente API
@@ -371,7 +391,10 @@ class YouTubeDownloaderApp(ctk.CTk):
                 self.after(0, self.update_status, f"Transfiriendo: {p}%", p / 100)
                 
             # Asegurar que el directorio existe
-            os.makedirs(dest_folder, exist_ok=True)
+            try:
+                os.makedirs(dest_folder, exist_ok=True)
+            except Exception as e_mkdir:
+                raise Exception(f"No se pudo crear/acceder a la carpeta de destino: {e_mkdir}")
             
             local_file = self.api.download_file(filename, dest_folder, progress_callback=dl_progress)
             
@@ -387,7 +410,9 @@ class YouTubeDownloaderApp(ctk.CTk):
             self.after(0, self.on_download_complete, local_file)
             
         except Exception as e:
-            print(f"ERROR en proceso de descarga: {e}")
+            print(f"ERROR CRÍTICO en proceso de descarga: {e}")
+            # Mostrar error en ventana emergente siempre
+            self.after(0, lambda: messagebox.showerror("Error de Descarga", f"Ocurrió un error:\n{str(e)}\n\nRevisa el log en {log_filename}"))
             self.after(0, self.on_download_error, str(e))
 
     def update_status(self, msg, progress_float):
