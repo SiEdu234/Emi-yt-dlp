@@ -44,3 +44,8 @@ coverage.xml
 logs/
 Emilia.ico
 .Emilia.ico
+upload_release.sh
+.upload_release.sh
+API_DOCS.md
+.API_DOCS.md
+
