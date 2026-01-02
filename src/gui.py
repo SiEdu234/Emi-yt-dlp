@@ -129,24 +129,24 @@ class YouTubeDownloaderApp(ctk.CTk):
         
         # Selector de Formato
         ctk.CTkLabel(self.options_frame, text="Formato:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        self.combo_format = ctk.CTkComboBox(self.options_frame, values=["mp4", "mp3", "m4a", "mkv", "webm", "gif"], state="readonly")
+        self.combo_format = ctk.CTkOptionMenu(self.options_frame, values=["mp4", "mp3", "m4a", "mkv", "webm", "gif"])
         self.combo_format.set("mp4")
         self.combo_format.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="ew")
 
         # Selector de Calidad
         ctk.CTkLabel(self.options_frame, text="Calidad:").grid(row=0, column=1, padx=10, pady=5, sticky="w")
-        self.combo_quality = ctk.CTkComboBox(self.options_frame, values=["Mejor disponible"], state="readonly")
+        self.combo_quality = ctk.CTkOptionMenu(self.options_frame, values=["Mejor disponible"])
         self.combo_quality.grid(row=1, column=1, padx=10, pady=(0, 10), sticky="ew")
         
         # Selector de Codec
         ctk.CTkLabel(self.options_frame, text="Codec (Avanzado):").grid(row=2, column=0, padx=10, pady=5, sticky="w")
-        self.combo_codec = ctk.CTkComboBox(self.options_frame, values=["auto", "h264", "h265", "vp9", "av1"], state="readonly")
+        self.combo_codec = ctk.CTkOptionMenu(self.options_frame, values=["auto", "h264", "h265", "vp9", "av1"])
         self.combo_codec.set("auto")
         self.combo_codec.grid(row=3, column=0, padx=10, pady=(0, 10), sticky="ew")
 
         # Selector de Subtítulos
         ctk.CTkLabel(self.options_frame, text="Subtítulos:").grid(row=2, column=1, padx=10, pady=5, sticky="w")
-        self.combo_subs = ctk.CTkComboBox(self.options_frame, values=["Ninguno"], state="readonly")
+        self.combo_subs = ctk.CTkOptionMenu(self.options_frame, values=["Ninguno"])
         self.combo_subs.grid(row=3, column=1, padx=10, pady=(0, 10), sticky="ew")
 
         # Botón Descargar
@@ -334,6 +334,10 @@ class YouTubeDownloaderApp(ctk.CTk):
                 
             local_file = self.api.download_file(filename, dest_folder, progress_callback=dl_progress)
             
+            # Verificar integridad
+            if not os.path.exists(local_file) or os.path.getsize(local_file) == 0:
+                raise Exception("El archivo se creó pero está vacío o no existe.")
+
             self.after(0, self.on_download_complete, local_file)
             
         except Exception as e:

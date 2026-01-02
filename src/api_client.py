@@ -49,40 +49,55 @@ class APIClient:
 
     def download_file(self, filename, destination_folder, progress_callback=None):
         """Descarga el archivo final desde el servidor a la máquina local."""
+        import urllib.parse
+        
+        # Estrategia de descarga: Intentar endpoint seguro, si falla (404), intentar endpoint clásico
+        local_filename = os.path.join(destination_folder, filename)
+        
+        # 1. Intentar endpoint seguro (Query Params)
         try:
-            # Usar el nuevo endpoint seguro con query params para evitar problemas de encoding en URL
             url = f"{self.base_url}/download-file-safe"
             params = {'filename': filename}
-            
-            local_filename = os.path.join(destination_folder, filename)
-            
-            print(f"DEBUG: Solicitando archivo: {url} con params: {params}")
+            print(f"DEBUG: Intentando descarga segura: {url} params={params}")
             
             with requests.get(url, params=params, stream=True, timeout=30) as r:
-                if r.status_code != 200:
-                    print(f"ERROR: Status {r.status_code} - {r.text}")
+                if r.status_code == 404:
+                    raise Exception("Endpoint seguro no encontrado (404)")
+                r.raise_for_status()
+                self._save_stream(r, local_filename, progress_callback)
+                return local_filename
+                
+        except Exception as e_safe:
+            print(f"DEBUG: Falló descarga segura: {e_safe}. Intentando método clásico...")
+            
+            # 2. Intentar endpoint clásico (Path Param) con codificación robusta
+            try:
+                safe_filename = urllib.parse.quote(filename)
+                url = f"{self.base_url}/download-file/{safe_filename}"
+                print(f"DEBUG: Intentando descarga clásica: {url}")
+                
+                with requests.get(url, stream=True, timeout=30) as r:
                     r.raise_for_status()
-                
-                total_length = r.headers.get('content-length')
-                
-                with open(local_filename, 'wb') as f:
-                    if total_length is None: # no content length header
-                        f.write(r.content)
-                    else:
-                        dl = 0
-                        total_length = int(total_length)
-                        for chunk in r.iter_content(chunk_size=8192):
-                            if chunk: # filter out keep-alive new chunks
-                                dl += len(chunk)
-                                f.write(chunk)
-                                if progress_callback:
-                                    percent = int(100 * dl / total_length)
-                                    progress_callback(percent)
-            return local_filename
-        except requests.RequestException as e:
-            raise Exception(f"Error al descargar archivo final: {e}")
-        except IOError as e:
-            raise Exception(f"Error al guardar archivo: {e}")
+                    self._save_stream(r, local_filename, progress_callback)
+                    return local_filename
+            except Exception as e_classic:
+                raise Exception(f"Error fatal descargando archivo. Seguro: {e_safe}. Clásico: {e_classic}")
+
+    def _save_stream(self, response, local_filename, progress_callback):
+        total_length = response.headers.get('content-length')
+        with open(local_filename, 'wb') as f:
+            if total_length is None:
+                f.write(response.content)
+            else:
+                dl = 0
+                total_length = int(total_length)
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        dl += len(chunk)
+                        f.write(chunk)
+                        if progress_callback:
+                            percent = int(100 * dl / total_length)
+                            progress_callback(percent)
 
     def download_subtitles(self, url, langs, destination_folder):
         """Descarga subtítulos."""
