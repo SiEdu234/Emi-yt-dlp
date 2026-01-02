@@ -4,7 +4,7 @@ import os
 import time
 import requests
 from io import BytesIO
-from PIL import Image
+from PIL import Image, ImageTk
 from tkinter import filedialog, messagebox
 from api_client import APIClient
 
@@ -23,15 +23,26 @@ class YouTubeDownloaderApp(ctk.CTk):
         
         # Icono
         try:
-            if os.path.exists("Emilia.ico"):
+            # Buscar el icono en el directorio actual o en el directorio del proyecto
+            icon_path = "Emilia.ico"
+            if not os.path.exists(icon_path):
+                # Si estamos en src/, el icono está arriba
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                project_root = os.path.dirname(script_dir)
+                possible_path = os.path.join(project_root, "Emilia.ico")
+                if os.path.exists(possible_path):
+                    icon_path = possible_path
+
+            if os.path.exists(icon_path):
                 # En Windows usa iconbitmap, en Linux iconphoto
                 if os.name == 'nt':
-                    self.iconbitmap("Emilia.ico")
+                    self.iconbitmap(icon_path)
                 else:
-                    # Para Linux necesitamos cargar la imagen
-                    icon_img = Image.open("Emilia.ico")
-                    self.iconphoto(True, ctk.CTkImage(icon_img))
-        except Exception:
+                    # Para Linux necesitamos cargar la imagen y usar ImageTk
+                    icon_img = Image.open(icon_path)
+                    self.iconphoto(True, ImageTk.PhotoImage(icon_img))
+        except Exception as e:
+            print(f"No se pudo cargar el icono: {e}")
             pass
 
         # Cliente API
@@ -54,7 +65,7 @@ class YouTubeDownloaderApp(ctk.CTk):
         self.sakuga_label = ctk.CTkLabel(self.sidebar_frame, text="Amiguitos de SakugaLatam", font=ctk.CTkFont(size=12, slant="italic"), text_color="gray")
         self.sakuga_label.grid(row=1, column=0, padx=20, pady=(0, 20))
 
-        self.sidebar_button_1 = ctk.CTkButton(self.sidebar_frame, text="Descargar", command=self.show_download_frame)
+        self.sidebar_button_1 = ctk.CTkButton(self.sidebar_frame, text="Nueva Búsqueda", command=self.show_download_frame)
         self.sidebar_button_1.grid(row=2, column=0, padx=20, pady=10)
         
         self.appearance_mode_label = ctk.CTkLabel(self.sidebar_frame, text="Tema:", anchor="w")
@@ -118,24 +129,24 @@ class YouTubeDownloaderApp(ctk.CTk):
         
         # Selector de Formato
         ctk.CTkLabel(self.options_frame, text="Formato:").grid(row=0, column=0, padx=10, pady=5, sticky="w")
-        self.combo_format = ctk.CTkComboBox(self.options_frame, values=["mp4", "mp3", "m4a", "mkv", "webm", "gif"])
+        self.combo_format = ctk.CTkComboBox(self.options_frame, values=["mp4", "mp3", "m4a", "mkv", "webm", "gif"], state="readonly")
         self.combo_format.set("mp4")
         self.combo_format.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="ew")
 
         # Selector de Calidad
         ctk.CTkLabel(self.options_frame, text="Calidad:").grid(row=0, column=1, padx=10, pady=5, sticky="w")
-        self.combo_quality = ctk.CTkComboBox(self.options_frame, values=["Mejor disponible"])
+        self.combo_quality = ctk.CTkComboBox(self.options_frame, values=["Mejor disponible"], state="readonly")
         self.combo_quality.grid(row=1, column=1, padx=10, pady=(0, 10), sticky="ew")
         
         # Selector de Codec
         ctk.CTkLabel(self.options_frame, text="Codec (Avanzado):").grid(row=2, column=0, padx=10, pady=5, sticky="w")
-        self.combo_codec = ctk.CTkComboBox(self.options_frame, values=["auto", "h264", "h265", "vp9", "av1"])
+        self.combo_codec = ctk.CTkComboBox(self.options_frame, values=["auto", "h264", "h265", "vp9", "av1"], state="readonly")
         self.combo_codec.set("auto")
         self.combo_codec.grid(row=3, column=0, padx=10, pady=(0, 10), sticky="ew")
 
         # Selector de Subtítulos
         ctk.CTkLabel(self.options_frame, text="Subtítulos:").grid(row=2, column=1, padx=10, pady=5, sticky="w")
-        self.combo_subs = ctk.CTkComboBox(self.options_frame, values=["Ninguno"])
+        self.combo_subs = ctk.CTkComboBox(self.options_frame, values=["Ninguno"], state="readonly")
         self.combo_subs.grid(row=3, column=1, padx=10, pady=(0, 10), sticky="ew")
 
         # Botón Descargar
@@ -152,7 +163,15 @@ class YouTubeDownloaderApp(ctk.CTk):
         self.lbl_status.grid(row=6, column=0, columnspan=2, padx=10, pady=5)
 
     def show_download_frame(self):
-        pass # Ya estamos aquí
+        # Limpiar interfaz para nueva descarga
+        self.url_entry.configure(state="normal")
+        self.url_entry.delete(0, 'end')
+        self.btn_download.configure(state="disabled")
+        self.btn_search.configure(state="normal")
+        self.info_frame.grid_remove()
+        self.lbl_status.configure(text="Listo para buscar", text_color="gray")
+        self.progress_bar.set(0)
+        self.downloading = False
 
     def change_appearance_mode_event(self, new_appearance_mode: str):
         ctk.set_appearance_mode(new_appearance_mode)
@@ -308,7 +327,7 @@ class YouTubeDownloaderApp(ctk.CTk):
                 raise Exception("El servidor no devolvió un nombre de archivo válido.")
                 
             self.after(0, self.update_status, f"Descargando: {filename}", 0)
-            print(f"DEBUG: Iniciando descarga de archivo: {filename}")
+            print(f"DEBUG: Iniciando descarga de archivo: {filename} a {dest_folder}")
             
             def dl_progress(p):
                 self.after(0, self.update_status, f"Transfiriendo: {p}%", p / 100)
@@ -318,6 +337,7 @@ class YouTubeDownloaderApp(ctk.CTk):
             self.after(0, self.on_download_complete, local_file)
             
         except Exception as e:
+            print(f"ERROR en proceso de descarga: {e}")
             self.after(0, self.on_download_error, str(e))
 
     def update_status(self, msg, progress_float):

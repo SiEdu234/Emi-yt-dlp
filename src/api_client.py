@@ -50,15 +50,19 @@ class APIClient:
     def download_file(self, filename, destination_folder, progress_callback=None):
         """Descarga el archivo final desde el servidor a la máquina local."""
         try:
-            # Asegurar que el nombre del archivo esté codificado para la URL
-            import urllib.parse
-            safe_filename = urllib.parse.quote(filename)
-            url = f"{self.base_url}/download-file/{safe_filename}"
+            # Usar el nuevo endpoint seguro con query params para evitar problemas de encoding en URL
+            url = f"{self.base_url}/download-file-safe"
+            params = {'filename': filename}
             
             local_filename = os.path.join(destination_folder, filename)
             
-            with requests.get(url, stream=True) as r:
-                r.raise_for_status()
+            print(f"DEBUG: Solicitando archivo: {url} con params: {params}")
+            
+            with requests.get(url, params=params, stream=True, timeout=30) as r:
+                if r.status_code != 200:
+                    print(f"ERROR: Status {r.status_code} - {r.text}")
+                    r.raise_for_status()
+                
                 total_length = r.headers.get('content-length')
                 
                 with open(local_filename, 'wb') as f:
