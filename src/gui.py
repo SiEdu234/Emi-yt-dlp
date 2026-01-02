@@ -49,10 +49,10 @@ class YouTubeDownloaderApp(ctk.CTk):
         super().__init__()
 
         # Mostrar alerta de log al inicio para que el usuario sepa dónde buscar
-        try:
-            messagebox.showinfo("Debug Mode", f"El archivo de registro (log) se está guardando en:\n{log_filename}\n\nRevisa este archivo si algo falla.")
-        except:
-            pass
+        # try:
+        #     messagebox.showinfo("Debug Mode", f"El archivo de registro (log) se está guardando en:\n{log_filename}\n\nRevisa este archivo si algo falla.")
+        # except:
+        #     pass
 
         # Configuración de la ventana principal
         self.title("Emi YouTube Downloader Pro")
