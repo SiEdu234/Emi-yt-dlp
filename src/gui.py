@@ -36,9 +36,9 @@ class LoggerWriter:
 sys.stdout = LoggerWriter(logging.info)
 sys.stderr = LoggerWriter(logging.error)
 
-print("=== INICIANDO EMI DOWNLOADER ===")
-print(f"Log guardado en: {log_filename}")
-print(f"Directorio de trabajo (CWD): {os.getcwd()}")
+# print("=== INICIANDO EMI DOWNLOADER ===")
+# print(f"Log guardado en: {log_filename}")
+# print(f"Directorio de trabajo (CWD): {os.getcwd()}")
 
 # Configuración global de apariencia
 ctk.set_appearance_mode("Dark")  # Modes: "System" (standard), "Dark", "Light"
@@ -71,32 +71,45 @@ class YouTubeDownloaderApp(ctk.CTk):
                 base_path = os.path.abspath(".")
             
             icon_path = os.path.join(base_path, icon_name)
-            print(f"Buscando icono en ruta base: {icon_path}")
+            # print(f"Buscando icono en ruta base: {icon_path}")
 
             # 2. Si no está, buscar en directorio del script
             if not os.path.exists(icon_path):
                 script_dir = os.path.dirname(os.path.abspath(__file__))
                 icon_path = os.path.join(script_dir, icon_name)
-                print(f"Buscando icono en script dir: {icon_path}")
+                # print(f"Buscando icono en script dir: {icon_path}")
             
             # 3. Si no está, buscar en directorio padre (proyecto)
             if not os.path.exists(icon_path):
                 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 icon_path = os.path.join(project_root, icon_name)
-                print(f"Buscando icono en project root: {icon_path}")
+                # print(f"Buscando icono en project root: {icon_path}")
 
             if os.path.exists(icon_path):
-                print(f"¡Icono encontrado!: {icon_path}")
+                # print(f"¡Icono encontrado!: {icon_path}")
                 if os.name == 'nt':
                     self.iconbitmap(icon_path)
                 else:
+                    # En Linux/Mac usamos iconphoto
                     icon_img = Image.open(icon_path)
                     self.app_icon = ImageTk.PhotoImage(icon_img)
                     self.wm_iconphoto(True, self.app_icon)
             else:
-                err_msg = f"No se encontró {icon_name} en ninguna ruta buscada."
-                print(f"ERROR: {err_msg}")
-                messagebox.showwarning("Icono Faltante", err_msg)
+                # Fallback final: intentar cargar directamente si está en CWD
+                if os.path.exists(icon_name):
+                     if os.name == 'nt':
+                        self.iconbitmap(icon_name)
+                     else:
+                        icon_img = Image.open(icon_name)
+                        self.app_icon = ImageTk.PhotoImage(icon_img)
+                        self.wm_iconphoto(True, self.app_icon)
+                # err_msg = f"No se encontró {icon_name} en ninguna ruta buscada."
+                # print(f"ERROR: {err_msg}")
+                pass
+                
+        except Exception as e:
+            # print(f"Error cargando icono: {e}")
+            pass
                 
         except Exception as e:
             print(f"EXCEPCIÓN cargando icono: {e}")
@@ -356,10 +369,28 @@ class YouTubeDownloaderApp(ctk.CTk):
 
     def process_download(self, url, options, dest_folder):
         try:
-            # 1. Iniciar
-            start_resp = self.api.start_download(url, options)
-            if not start_resp.get('success'):
-                raise Exception(start_resp.get('error'))
+            # 1. Iniciar (con reintentos para evitar error inicial)
+            start_resp = None
+            last_error = None
+            max_retries = 3
+            
+            for attempt in range(max_retries):
+                try:
+                    # print(f"DEBUG: Intentando iniciar descarga (Intento {attempt+1}/{max_retries})")
+                    start_resp = self.api.start_download(url, options)
+                    if start_resp and start_resp.get('success'):
+                        break
+                    else:
+                        last_error = start_resp.get('error') if start_resp else "Respuesta vacía"
+                except Exception as e:
+                    last_error = str(e)
+                    # print(f"DEBUG: Falló intento {attempt+1}: {e}")
+                
+                if attempt < max_retries - 1:
+                    time.sleep(2) # Esperar 2 segundos antes de reintentar
+
+            if not start_resp or not start_resp.get('success'):
+                raise Exception(f"Error al iniciar descarga tras {max_retries} intentos: {last_error}")
             
             download_id = start_resp.get('download_id')
             
