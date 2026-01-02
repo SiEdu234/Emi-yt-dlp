@@ -4,7 +4,7 @@ Cliente de escritorio para descargar videos de YouTube utilizando la API de `you
 
 ## Requisitos del Sistema (para ejecutar desde código fuente)
 - Python 3.8+
-- Servidor `youtube-downloader` en ejecución (por defecto en http://localhost:5000)
+- Servidor `youtube-downloader` en ejecución (configurado por defecto en `http://wise-provinces.gl.at.ply.gg:38158`)
 - Librerías de Python: `requests`
 
 ## Ejecutable (Sin dependencias)

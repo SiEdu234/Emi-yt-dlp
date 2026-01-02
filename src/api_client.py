@@ -3,7 +3,7 @@ import time
 import os
 
 class APIClient:
-    def __init__(self, base_url="http://localhost:5000/api"):
+    def __init__(self, base_url="http://wise-provinces.gl.at.ply.gg:38158/api"):
         self.base_url = base_url
 
     def get_video_info(self, url):
