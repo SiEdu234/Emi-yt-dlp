@@ -3,7 +3,7 @@ from tkinter import ttk, filedialog, messagebox
 import threading
 import os
 import time
-from .api_client import APIClient
+from api_client import APIClient
 
 class YouTubeDownloaderApp:
     def __init__(self, root):

@@ -1,6 +1,17 @@
 #!/bin/bash
 set -e # Detener script si hay errores
 
+echo "Verificando requisitos del sistema..."
+
+# Verificar si tkinter está instalado en el sistema
+if ! python3 -c "import tkinter" &> /dev/null; then
+    echo "Error: 'tkinter' no está instalado en tu sistema Python."
+    echo "Por favor, instálalo ejecutando:"
+    echo "sudo apt-get install python3-tk"
+    echo "O el comando equivalente para tu distribución de Linux."
+    exit 1
+fi
+
 echo "Configurando entorno virtual..."
 
 # 1. Crear entorno virtual si no existe
@@ -20,15 +31,18 @@ pip install pyinstaller
 
 # 4. Construir ejecutable
 echo "Construyendo ejecutable..."
-# --onefile: Crea un solo archivo ejecutable
-# --noconsole: No muestra la consola (para aplicaciones GUI)
-# --name: Nombre del ejecutable
-# --clean: Limpia caché de pyinstaller
-# --paths: Asegura que encuentre los módulos en src
-pyinstaller --noconsole --onefile --clean --name "Emi-yt-dlp" --paths=src src/main.py
+# --hidden-import: Forzar inclusión de tkinter
+pyinstaller --noconsole --onefile --clean \
+    --name "Emi-yt-dlp" \
+    --paths=src \
+    --hidden-import=tkinter \
+    --hidden-import=tkinter.filedialog \
+    --hidden-import=tkinter.messagebox \
+    --hidden-import=tkinter.ttk \
+    src/main.py
 
 echo "Construcción completada."
 echo "El ejecutable se encuentra en la carpeta 'dist/':"
 ls -l dist/Emi-yt-dlp
 
-echo "Nota: Puedes borrar la carpeta 'venv' y 'build' si ya no las necesitas, pero 'venv' es útil para desarrollo."
+echo "Nota: Si al ejecutarlo no abre nada, intenta ejecutarlo desde la terminal ./dist/Emi-yt-dlp para ver errores."
