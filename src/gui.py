@@ -16,7 +16,7 @@ log_filename = os.path.join(os.path.expanduser("~"), "emi_debug.log")
 
 logging.basicConfig(
     filename=log_filename,
-    level=logging.DEBUG,
+    level=logging.WARNING,
     format='%(asctime)s - %(levelname)s - %(message)s',
     filemode='w'
 )

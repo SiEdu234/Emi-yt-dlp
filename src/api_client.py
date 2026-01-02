@@ -58,7 +58,7 @@ class APIClient:
         try:
             url = f"{self.base_url}/download-file-safe"
             params = {'filename': filename}
-            print(f"DEBUG: Intentando descarga segura: {url} params={params}")
+            # print(f"DEBUG: Intentando descarga segura: {url} params={params}")
             
             with requests.get(url, params=params, stream=True, timeout=30) as r:
                 if r.status_code == 404:
@@ -68,13 +68,13 @@ class APIClient:
                 return local_filename
                 
         except Exception as e_safe:
-            print(f"DEBUG: Falló descarga segura: {e_safe}. Intentando método clásico...")
+            # print(f"DEBUG: Falló descarga segura: {e_safe}. Intentando método clásico...")
             
             # 2. Intentar endpoint clásico (Path Param) con codificación robusta
             try:
                 safe_filename = urllib.parse.quote(filename)
                 url = f"{self.base_url}/download-file/{safe_filename}"
-                print(f"DEBUG: Intentando descarga clásica: {url}")
+                # print(f"DEBUG: Intentando descarga clásica: {url}")
                 
                 with requests.get(url, stream=True, timeout=30) as r:
                     r.raise_for_status()
@@ -85,7 +85,7 @@ class APIClient:
 
     def _save_stream(self, response, local_filename, progress_callback):
         total_length = response.headers.get('content-length')
-        print(f"DEBUG: Iniciando escritura en {local_filename}. Tamaño esperado: {total_length}")
+        # print(f"DEBUG: Iniciando escritura en {local_filename}. Tamaño esperado: {total_length}")
         
         try:
             with open(local_filename, 'wb') as f:
@@ -94,14 +94,17 @@ class APIClient:
                 else:
                     dl = 0
                     total_length = int(total_length)
+                    last_percent = -1
                     for chunk in response.iter_content(chunk_size=8192):
                         if chunk:
                             dl += len(chunk)
                             f.write(chunk)
                             if progress_callback:
                                 percent = int(100 * dl / total_length)
-                                progress_callback(percent)
-            print(f"DEBUG: Escritura finalizada en {local_filename}")
+                                if percent > last_percent:
+                                    progress_callback(percent)
+                                    last_percent = percent
+            # print(f"DEBUG: Escritura finalizada en {local_filename}")
         except Exception as e:
             print(f"ERROR escribiendo archivo: {e}")
             raise
