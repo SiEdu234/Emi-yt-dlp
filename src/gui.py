@@ -3,10 +3,40 @@ import threading
 import os
 import time
 import requests
+import sys
+import logging
 from io import BytesIO
 from PIL import Image, ImageTk
 from tkinter import filedialog, messagebox
 from api_client import APIClient
+
+# --- CONFIGURACIÓN DE LOGS ---
+# Esto creará un archivo 'emi_debug.log' en la misma carpeta donde ejecutes la app
+log_filename = "emi_debug.log"
+logging.basicConfig(
+    filename=log_filename,
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    filemode='w'
+)
+
+# Redirigir prints y errores al archivo de log
+class LoggerWriter:
+    def __init__(self, level):
+        self.level = level
+
+    def write(self, message):
+        if message.strip():
+            self.level(message)
+
+    def flush(self):
+        pass
+
+sys.stdout = LoggerWriter(logging.info)
+sys.stderr = LoggerWriter(logging.error)
+
+print("=== INICIANDO EMI DOWNLOADER ===")
+print(f"Directorio de trabajo: {os.getcwd()}")
 
 # Configuración global de apariencia
 ctk.set_appearance_mode("Dark")  # Modes: "System" (standard), "Dark", "Light"
@@ -25,15 +55,19 @@ class YouTubeDownloaderApp(ctk.CTk):
         try:
             # Buscar el icono en el directorio actual o en el directorio del proyecto
             icon_path = "Emilia.ico"
+            print(f"Buscando icono en: {os.path.abspath(icon_path)}")
+            
             if not os.path.exists(icon_path):
                 # Si estamos en src/, el icono está arriba
                 script_dir = os.path.dirname(os.path.abspath(__file__))
                 project_root = os.path.dirname(script_dir)
                 possible_path = os.path.join(project_root, "Emilia.ico")
+                print(f"Intentando ruta alternativa: {possible_path}")
                 if os.path.exists(possible_path):
                     icon_path = possible_path
 
             if os.path.exists(icon_path):
+                print(f"Icono encontrado en: {icon_path}")
                 # En Windows usa iconbitmap, en Linux iconphoto
                 if os.name == 'nt':
                     self.iconbitmap(icon_path)
@@ -43,8 +77,10 @@ class YouTubeDownloaderApp(ctk.CTk):
                     icon_img = Image.open(icon_path)
                     self.app_icon = ImageTk.PhotoImage(icon_img)
                     self.wm_iconphoto(True, self.app_icon)
+            else:
+                print("ERROR: No se encontró el archivo Emilia.ico")
         except Exception as e:
-            print(f"No se pudo cargar el icono: {e}")
+            print(f"EXCEPCIÓN cargando icono: {e}")
             pass
 
         # Cliente API
