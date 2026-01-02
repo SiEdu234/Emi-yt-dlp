@@ -6,6 +6,16 @@ class APIClient:
     def __init__(self, base_url="http://wise-provinces.gl.at.ply.gg:38158/api"):
         self.base_url = base_url
 
+    def check_connection(self):
+        """Verifica si el servidor está activo."""
+        try:
+            # Intentamos conectar a un endpoint ligero o raíz si existe, 
+            # pero como es /api, probaremos con video-info sin params que debería dar 400 pero conectar
+            response = requests.get(f"{self.base_url}/video-info", timeout=5)
+            return True
+        except requests.RequestException:
+            return False
+
     def get_video_info(self, url):
         """Obtiene información del video desde la API."""
         try:
@@ -40,7 +50,11 @@ class APIClient:
     def download_file(self, filename, destination_folder, progress_callback=None):
         """Descarga el archivo final desde el servidor a la máquina local."""
         try:
-            url = f"{self.base_url}/download-file/{filename}"
+            # Asegurar que el nombre del archivo esté codificado para la URL
+            import urllib.parse
+            safe_filename = urllib.parse.quote(filename)
+            url = f"{self.base_url}/download-file/{safe_filename}"
+            
             local_filename = os.path.join(destination_folder, filename)
             
             with requests.get(url, stream=True) as r:
@@ -54,11 +68,12 @@ class APIClient:
                         dl = 0
                         total_length = int(total_length)
                         for chunk in r.iter_content(chunk_size=8192):
-                            dl += len(chunk)
-                            f.write(chunk)
-                            if progress_callback:
-                                percent = int(100 * dl / total_length)
-                                progress_callback(percent)
+                            if chunk: # filter out keep-alive new chunks
+                                dl += len(chunk)
+                                f.write(chunk)
+                                if progress_callback:
+                                    percent = int(100 * dl / total_length)
+                                    progress_callback(percent)
             return local_filename
         except requests.RequestException as e:
             raise Exception(f"Error al descargar archivo final: {e}")
